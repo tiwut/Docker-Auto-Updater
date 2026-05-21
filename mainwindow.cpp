@@ -11,20 +11,31 @@
 #include <QScrollBar>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    setWindowTitle("Docker Auto Updater");
-    resize(600, 500);
+    setWindowTitle("Docker Auto Deployer & Updater");
+    resize(600, 550);
+
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+
     QHBoxLayout *topLayout = new QHBoxLayout();
-    usernameInput = new QLineEdit("tiwutdev");
-    fetchBtn = new QPushButton("1. Fetch Repos from Hub");
+    usernameInput = new QLineEdit("tiwutdev"); 
+    fetchBtn = new QPushButton("1. Fetch Existing Repos");
     topLayout->addWidget(new QLabel("Docker Hub User:"));
     topLayout->addWidget(usernameInput);
     topLayout->addWidget(fetchBtn);
     mainLayout->addLayout(topLayout);
+
     repoList = new QListWidget();
-    mainLayout->addWidget(new QLabel("Select Repository:"));
+    mainLayout->addWidget(new QLabel("Select an existing repo, OR type a new one below:"));
     mainLayout->addWidget(repoList);
+
+    QHBoxLayout *targetLayout = new QHBoxLayout();
+    targetRepoInput = new QLineEdit();
+    targetRepoInput->setPlaceholderText("e.g., my-awesome-new-app");
+    targetLayout->addWidget(new QLabel("Image Name:"));
+    targetLayout->addWidget(targetRepoInput);
+    mainLayout->addLayout(targetLayout);
+
     QHBoxLayout *pathLayout = new QHBoxLayout();
     localPathInput = new QLineEdit();
     localPathInput->setPlaceholderText("Select the local folder containing the Dockerfile...");
@@ -32,23 +43,30 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     pathLayout->addWidget(localPathInput);
     pathLayout->addWidget(browseBtn);
     mainLayout->addLayout(pathLayout);
-    updateBtn = new QPushButton("2. Rebuild & Push Selected Repo");
+
+    updateBtn = new QPushButton("2. Build & Push Image");
     updateBtn->setMinimumHeight(40);
     updateBtn->setStyleSheet("background-color: #007bff; color: white; font-weight: bold;");
     mainLayout->addWidget(updateBtn);
+
     logOutput = new QTextEdit();
     logOutput->setReadOnly(true);
     logOutput->setStyleSheet("background-color: #1e1e1e; color: #00ff00; font-family: monospace;");
     mainLayout->addWidget(new QLabel("Console Output:"));
     mainLayout->addWidget(logOutput);
+
     setCentralWidget(centralWidget);
+
     networkManager = new QNetworkAccessManager(this);
     dockerProcess = new QProcess(this);
     dockerProcess->setProcessChannelMode(QProcess::MergedChannels);
+
     connect(fetchBtn, &QPushButton::clicked, this, &MainWindow::fetchRepositories);
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onNetworkReply);
+    connect(repoList, &QListWidget::itemClicked, this, &MainWindow::onRepoSelected);
     connect(browseBtn, &QPushButton::clicked, this, &MainWindow::selectLocalFolder);
     connect(updateBtn, &QPushButton::clicked, this, &MainWindow::startUpdate);
+    
     connect(dockerProcess, &QProcess::readyReadStandardOutput, this, &MainWindow::onProcessOutput);
     connect(dockerProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &MainWindow::onProcessFinished);
 }
@@ -58,8 +76,10 @@ MainWindow::~MainWindow() {}
 void MainWindow::fetchRepositories() {
     QString username = usernameInput->text().trimmed();
     if (username.isEmpty()) return;
+
     repoList->clear();
     logOutput->append("Fetching repositories for " + username + "...");
+    
     QUrl url("https://hub.docker.com/v2/repositories/" + username + "/?page_size=100");
     networkManager->get(QNetworkRequest(url));
 }
@@ -69,6 +89,7 @@ void MainWindow::onNetworkReply(QNetworkReply *reply) {
         QByteArray response = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(response);
         QJsonArray results = doc.object().value("results").toArray();
+
         for (const QJsonValue &val : results) {
             QString repoName = val.toObject().value("name").toString();
             repoList->addItem(repoName);
@@ -80,6 +101,10 @@ void MainWindow::onNetworkReply(QNetworkReply *reply) {
     reply->deleteLater();
 }
 
+void MainWindow::onRepoSelected(QListWidgetItem *item) {
+    targetRepoInput->setText(item->text());
+}
+
 void MainWindow::selectLocalFolder() {
     QString dir = QFileDialog::getExistingDirectory(this, "Select Directory containing Dockerfile", "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
     if (!dir.isEmpty()) {
@@ -88,8 +113,9 @@ void MainWindow::selectLocalFolder() {
 }
 
 void MainWindow::startUpdate() {
-    if (!repoList->currentItem()) {
-        QMessageBox::warning(this, "Error", "Please select a repository from the list.");
+    QString repoName = targetRepoInput->text().trimmed();
+    if (repoName.isEmpty()) {
+        QMessageBox::warning(this, "Error", "Please enter an Image Name or select one from the list.");
         return;
     }
     if (localPathInput->text().isEmpty()) {
@@ -97,14 +123,16 @@ void MainWindow::startUpdate() {
         return;
     }
 
-    QString username = usernameInput->text();
-    QString repoName = repoList->currentItem()->text();
+    QString username = usernameInput->text().trimmed();
     currentRepo = username + "/" + repoName + ":latest";
     QString localDir = localPathInput->text();
+
     logOutput->clear();
     updateBtn->setEnabled(false);
+
     currentAction = "BUILD";
     logOutput->append(">>> STARTING BUILD: " + currentRepo);
+    
     QString cmd = QString("docker build --pull -t %1 '%2'").arg(currentRepo, localDir);
     dockerProcess->start("/bin/bash", QStringList() << "-c" << cmd);
 }
@@ -112,6 +140,7 @@ void MainWindow::startUpdate() {
 void MainWindow::onProcessOutput() {
     QByteArray output = dockerProcess->readAllStandardOutput();
     logOutput->append(QString::fromUtf8(output).trimmed());
+    
     QScrollBar *sb = logOutput->verticalScrollBar();
     sb->setValue(sb->maximum());
 }
@@ -136,7 +165,7 @@ void MainWindow::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus
         dockerProcess->start("/bin/bash", QStringList() << "-c" << cmd);
     } 
     else if (currentAction == "PUSH") {
-        logOutput->append("\n>>> SUCCESS! Image updated and pushed securely to Docker Hub.");
+        logOutput->append("\n>>> SUCCESS! Image deployed securely to Docker Hub.");
         updateBtn->setEnabled(true);
     }
 }

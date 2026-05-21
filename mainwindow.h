@@ -19,6 +19,7 @@ public:
 private slots:
     void fetchRepositories();
     void onNetworkReply(class QNetworkReply *reply);
+    void onRepoSelected(class QListWidgetItem *item);
     void selectLocalFolder();
     void startUpdate();
     void onProcessOutput();
@@ -28,13 +29,16 @@ private:
     QLineEdit *usernameInput;
     QPushButton *fetchBtn;
     QListWidget *repoList;
+    QLineEdit *targetRepoInput;
     QLineEdit *localPathInput;
     QPushButton *browseBtn;
     QPushButton *updateBtn;
     QTextEdit *logOutput;
+
     QNetworkAccessManager *networkManager;
     QProcess *dockerProcess;
-    QString currentAction;
+    
+    QString currentAction; 
     QString currentRepo;
 };
 
