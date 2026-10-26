@@ -1,15 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(DockerUpdater VERSION 1.0 LANGUAGES CXX)
+project(DockerUpdater VERSION 2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Network)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Network)
-
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ADWAITA REQUIRED libadwaita-1)
 
 add_executable(DockerUpdater
     main.cpp
@@ -17,4 +13,6 @@ add_executable(DockerUpdater
     mainwindow.h
 )
 
-target_link_libraries(DockerUpdater PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
+target_include_directories(DockerUpdater PRIVATE ${ADWAITA_INCLUDE_DIRS})
+target_compile_options(DockerUpdater PRIVATE ${ADWAITA_CFLAGS_OTHER})
+target_link_libraries(DockerUpdater PRIVATE ${ADWAITA_LIBRARIES} pthread)
