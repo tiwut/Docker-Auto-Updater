@@ -4,6 +4,8 @@ A lightweight, modern Linux desktop application to manage, rebuild, and securely
 
 Built for developers, homelabbers, and sysadmins who want to maintain published container images patched against base OS vulnerabilities without manually constructing complex multi-platform build commands.
 
+<img width="1086" height="1161" alt="image" src="https://github.com/user-attachments/assets/1e2b7044-f092-4ff1-a2da-b257d82854da" />
+
 ## Overview
 When container images are published to registries like Docker Hub, underlying base images (Debian, Alpine, Ubuntu) and runtime packages continuously receive security updates.
 
